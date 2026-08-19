@@ -1,26 +1,41 @@
 // src/pages/Suivi.tsx
 // Page publique "Suivre ma réservation" : recherche une réservation par référence + téléphone
 // (aucune connexion nécessaire), et affiche un message adapté à son statut actuel.
-import { useState, FormEvent, ChangeEvent } from 'react';
+import { useState, useEffect, FormEvent, ChangeEvent } from 'react';
 import { trouverParReferenceEtTelephone } from '../services/reservationService';
 import { getRoomById } from '../services/roomService';
 import { Reservation } from '../types/reservation.types';
+import { Room } from '../types/room.types';
 import { StatusBadge } from '../components/StatusBadge';
 
 export function Suivi() {
   const [reference, setReference] = useState<string>('');
   const [telephone, setTelephone] = useState<string>('');
   const [resultat, setResultat] = useState<Reservation | null>(null);
+  const [room, setRoom] = useState<Room | undefined>(undefined);
   const [recherche, setRecherche] = useState<boolean>(false); // true dès qu'une recherche a été lancée
+  const [chargement, setChargement] = useState<boolean>(false);
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>): void => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    const trouvee = trouverParReferenceEtTelephone(reference, telephone);
-    setResultat(trouvee ?? null);
-    setRecherche(true);
+    setChargement(true);
+    try {
+      const trouvee = await trouverParReferenceEtTelephone(reference, telephone);
+      setResultat(trouvee ?? null);
+      setRecherche(true);
+    } finally {
+      setChargement(false);
+    }
   };
 
-  const room = resultat ? getRoomById(resultat.roomId) : undefined;
+  // Récupère la chambre associée dès qu'un résultat de réservation est trouvé
+  useEffect(() => {
+    if (!resultat) {
+      setRoom(undefined);
+      return;
+    }
+    getRoomById(resultat.roomId).then(setRoom);
+  }, [resultat]);
 
   // Message affiché à l'utilisateur selon le statut trouvé (typé Record pour couvrir tous les cas)
   const messageParStatut: Record<string, string> = {
@@ -60,9 +75,10 @@ export function Suivi() {
         </div>
         <button
           type="submit"
-          className="w-full bg-[#8A5A34] hover:bg-[#6b4527] text-white font-medium rounded-lg py-2.5 transition-colors"
+          disabled={chargement}
+          className="w-full bg-[#8A5A34] hover:bg-[#6b4527] disabled:opacity-60 text-white font-medium rounded-lg py-2.5 transition-colors"
         >
-          Vérifier le statut
+          {chargement ? 'Recherche...' : 'Vérifier le statut'}
         </button>
       </form>
 

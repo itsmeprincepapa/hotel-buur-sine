@@ -9,7 +9,7 @@ import { calculerNombreNuits, calculerMontant } from '../services/reservationSer
 
 interface ReservationFormProps {
   room: Room;
-  onSubmit: (formData: ReservationFormData) => string; // retourne la référence générée
+  onSubmit: (formData: ReservationFormData) => Promise<string>; // résout avec la référence générée
   onClose: () => void;
 }
 
@@ -24,6 +24,8 @@ export function ReservationForm({ room, onSubmit, onClose }: ReservationFormProp
   });
   const [montant, setMontant] = useState<number>(0);
   const [reference, setReference] = useState<string>(''); // vide tant que le formulaire n'est pas soumis
+  const [envoiEnCours, setEnvoiEnCours] = useState<boolean>(false);
+  const [erreur, setErreur] = useState<string>('');
 
   // Recalcule le montant à chaque changement de dates
   useEffect(() => {
@@ -41,10 +43,18 @@ export function ReservationForm({ room, onSubmit, onClose }: ReservationFormProp
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e: FormEvent<HTMLFormElement>): void => {
+  const handleSubmit = async (e: FormEvent<HTMLFormElement>): Promise<void> => {
     e.preventDefault();
-    const nouvelleReference = onSubmit({ ...formData, roomId: room.id });
-    setReference(nouvelleReference); // déclenche l'affichage de l'écran de confirmation
+    setErreur('');
+    setEnvoiEnCours(true);
+    try {
+      const nouvelleReference = await onSubmit({ ...formData, roomId: room.id });
+      setReference(nouvelleReference); // déclenche l'affichage de l'écran de confirmation
+    } catch {
+      setErreur("Une erreur est survenue lors de l'envoi de votre demande. Veuillez réessayer.");
+    } finally {
+      setEnvoiEnCours(false);
+    }
   };
 
   return (
@@ -134,11 +144,18 @@ export function ReservationForm({ room, onSubmit, onClose }: ReservationFormProp
                 </div>
               )}
 
+              {erreur && (
+                <div className="rounded-lg bg-red-50 border border-red-200 text-red-600 text-sm px-4 py-2">
+                  {erreur}
+                </div>
+              )}
+
               <button
                 type="submit"
-                className="w-full bg-[#8A5A34] hover:bg-[#6b4527] text-white font-medium rounded-lg py-2.5 mt-2 transition-colors"
+                disabled={envoiEnCours}
+                className="w-full bg-[#8A5A34] hover:bg-[#6b4527] disabled:opacity-60 text-white font-medium rounded-lg py-2.5 mt-2 transition-colors"
               >
-                Envoyer la demande de réservation
+                {envoiEnCours ? 'Envoi en cours...' : 'Envoyer la demande de réservation'}
               </button>
             </form>
           </>

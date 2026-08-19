@@ -1,54 +1,36 @@
 // src/services/roomService.ts
-// Couche d'accès aux données pour les chambres (CRUD complet), avec persistance
-// dans le localStorage. Utilisée par useRooms() et par reservationService (mise à jour de statut).
+// Couche d'accès aux données pour les chambres (CRUD complet).
+// Appelle désormais l'API backend (Express + MySQL) au lieu du localStorage.
 import { Room, RoomStatus } from '../types/room.types';
-import { mockRooms } from '../data/mockRooms';
+import { apiFetch } from './apiClient';
 
-const STORAGE_KEY = 'buur_sine_rooms';
+export async function getRooms(): Promise<Room[]> {
+  return apiFetch<Room[]>('/rooms', { auth: false });
+}
 
-function loadRooms(): Room[] {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    try {
-      return JSON.parse(stored) as Room[];
-    } catch {
-      // en cas de données corrompues, on repart des mock data
-    }
+export async function getRoomById(id: string): Promise<Room | undefined> {
+  try {
+    return await apiFetch<Room>(`/rooms/${id}`, { auth: false });
+  } catch {
+    return undefined;
   }
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(mockRooms));
-  return mockRooms;
 }
 
-function saveRooms(rooms: Room[]): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(rooms));
+export async function addRoom(room: Omit<Room, 'id'>): Promise<Room[]> {
+  await apiFetch<Room>('/rooms', { method: 'POST', body: room });
+  return getRooms();
 }
 
-export function getRooms(): Room[] {
-  return loadRooms();
+export async function updateRoom(id: string, updates: Partial<Room>): Promise<Room[]> {
+  await apiFetch<Room>(`/rooms/${id}`, { method: 'PUT', body: updates });
+  return getRooms();
 }
 
-export function getRoomById(id: string): Room | undefined {
-  return loadRooms().find((r) => r.id === id);
-}
-
-export function addRoom(room: Room): Room[] {
-  const rooms = [...loadRooms(), room];
-  saveRooms(rooms);
-  return rooms;
-}
-
-export function updateRoom(id: string, updates: Partial<Room>): Room[] {
-  const rooms = loadRooms().map((r) => (r.id === id ? { ...r, ...updates } : r));
-  saveRooms(rooms);
-  return rooms;
-}
-
-export function updateRoomStatus(id: string, statut: RoomStatus): Room[] {
+export async function updateRoomStatus(id: string, statut: RoomStatus): Promise<Room[]> {
   return updateRoom(id, { statut });
 }
 
-export function deleteRoom(id: string): Room[] {
-  const rooms = loadRooms().filter((r) => r.id !== id);
-  saveRooms(rooms);
-  return rooms;
+export async function deleteRoom(id: string): Promise<Room[]> {
+  await apiFetch<void>(`/rooms/${id}`, { method: 'DELETE' });
+  return getRooms();
 }
